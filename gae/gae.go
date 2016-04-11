@@ -146,7 +146,12 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	context.Infof("Parsed Request=%#v\n", req)
 
 	if Password != "" {
-		if password := params.Get("X-UrlFetch-Password"); password != "" && password != Password {
+		password := params.Get("X-UrlFetch-Password")
+		switch {
+		case password == "":
+			handlerError(rw, "No Password.", 403)
+			return
+		case password != Password:
 			handlerError(rw, "Wrong Password.", 403)
 			return
 		}
