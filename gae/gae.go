@@ -143,6 +143,8 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	}
 	// req.Header.Del("X-Cloud-Trace-Context")
 
+	context.Infof("Parsed Request=%#v\n", req)
+
 	if Password != "" {
 		if password := params.Get("X-UrlFetch-Password"); password != "" && password != Password {
 			handlerError(rw, "Wrong Password.", 403)
@@ -191,6 +193,16 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 
 	// Fix missing content-length
 	resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
+
+	// Fix Set-Cookie header for python client
+	if r.Header.Get("User-Agent") == "" {
+		const cookieHeader string = "Set-Cookie"
+		if resp.Header.Get(cookieHeader) != "" {
+			resp.Header[cookieHeader] = []string{strings.Join(resp.Header[cookieHeader], ", ")}
+		}
+	}
+
+	context.Infof("Write Response=%#v\n", resp)
 
 	var b bytes.Buffer
 	w, err := flate.NewWriter(&b, flate.BestCompression)
