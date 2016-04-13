@@ -11,17 +11,6 @@ import mimetypes
 
 sys.dont_write_bytecode = True
 mimetypes._winreg = None
-sys.path.append('google_appengine')
-
-try:
-    filename = './google_appengine/google/appengine/tools/appengine_rpc_httplib2.py'
-    with open(filename, 'rb') as fp:
-        text = fp.read()
-    if '~/.appcfg_oauth2_tokens' in text:
-        with open(filename, 'wb') as fp:
-            fp.write(text.replace('~/.appcfg_oauth2_tokens', './.appcfg_oauth2_tokens'))
-except Exception:
-    pass
 
 def println(s, file=sys.stderr):
     assert type(s) is type(u'')
@@ -34,19 +23,6 @@ try:
 except socket.error:
     println(u'警告：建议先启动 GoProxy 客户端或者 VPN 然后再上传，如果您的 VPN 已经打开的话，请按回车键继续。')
     raw_input()
-
-
-import httplib2
-def _ssl_wrap_socket(sock, key_file, cert_file,
-                     disable_validation, ca_certs):
-    cert_reqs = ssl.CERT_NONE
-    return ssl.wrap_socket(sock, keyfile=key_file, certfile=cert_file,
-                           cert_reqs=ssl.CERT_NONE, ca_certs=None,
-                           ssl_version=ssl.PROTOCOL_TLSv1)
-def _ValidateCertificateHostname(self, cert, hostname):
-    return True
-httplib2._ssl_wrap_socket = _ssl_wrap_socket
-httplib2.HTTPSConnectionWithTimeout._ValidateCertificateHostname = _ValidateCertificateHostname
 
 
 _realgetpass = getpass.getpass
@@ -74,8 +50,31 @@ def getpass_getpass(prompt='Password:', stream=None):
 getpass.getpass = getpass_getpass
 
 
+println("Loading Google Appengine SDK...")
+sys.path.append('google_appengine')
+try:
+    filename = './google_appengine/google/appengine/tools/appengine_rpc_httplib2.py'
+    with open(filename, 'rb') as fp:
+        text = fp.read()
+    if '~/.appcfg_oauth2_tokens' in text:
+        with open(filename, 'wb') as fp:
+            fp.write(text.replace('~/.appcfg_oauth2_tokens', './.appcfg_oauth2_tokens'))
+except Exception:
+    pass
+
+import httplib2
+def _ssl_wrap_socket(sock, key_file, cert_file,
+                     disable_validation, ca_certs):
+    cert_reqs = ssl.CERT_NONE
+    return ssl.wrap_socket(sock, keyfile=key_file, certfile=cert_file,
+                           cert_reqs=ssl.CERT_NONE, ca_certs=None,
+                           ssl_version=ssl.PROTOCOL_TLSv1)
+def _ValidateCertificateHostname(self, cert, hostname):
+    return True
+httplib2._ssl_wrap_socket = _ssl_wrap_socket
+httplib2.HTTPSConnectionWithTimeout._ValidateCertificateHostname = _ValidateCertificateHostname
+
 from google.appengine.tools import appengine_rpc, appcfg
-appengine_rpc.HttpRpcServer.DEFAULT_COOKIE_FILE_PATH = './.appcfg_cookies'
 
 def upload(dirname, appid):
     assert isinstance(dirname, basestring) and isinstance(appid, basestring)
