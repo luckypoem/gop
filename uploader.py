@@ -6,6 +6,12 @@ import os
 import re
 import getpass
 import socket
+import ssl
+import mimetypes
+
+sys.dont_write_bytecode = True
+mimetypes._winreg = None
+sys.path.append('google_appengine')
 
 def println(s, file=sys.stderr):
     assert type(s) is type(u'')
@@ -13,20 +19,25 @@ def println(s, file=sys.stderr):
 
 try:
     socket.create_connection(('127.0.0.1', 8087), timeout=1).close()
-    os.environ['HTTPS_PROXY'] = '127.0.0.1:8087'
+    os.environ['HTTP_PROXY'] = 'http://127.0.0.1:8087'
+    os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:8087'
 except socket.error:
     println(u'警告：建议先启动 goagent 客户端或者 VPN 然后再上传，如果您的 VPN 已经打开的话，请按回车键继续。')
     raw_input()
 
-sys.modules.pop('google', None)
-sys.path.insert(0, os.path.abspath(os.path.join(__file__, '../google_appengine.zip')))
 
-import mimetypes
-mimetypes._winreg = None
+import httplib2
+def _ssl_wrap_socket(sock, key_file, cert_file,
+                     disable_validation, ca_certs):
+    cert_reqs = ssl.CERT_NONE
+    return ssl.wrap_socket(sock, keyfile=key_file, certfile=cert_file,
+                           cert_reqs=ssl.CERT_NONE, ca_certs=None,
+                           ssl_version=ssl.PROTOCOL_TLSv1)
+def _ValidateCertificateHostname(self, cert, hostname):
+    return True
+httplib2._ssl_wrap_socket = _ssl_wrap_socket
+httplib2.HTTPSConnectionWithTimeout._ValidateCertificateHostname = _ValidateCertificateHostname
 
-import urllib2
-import fancy_urllib
-fancy_urllib.FancyHTTPSHandler = urllib2.HTTPSHandler
 
 _realgetpass = getpass.getpass
 def getpass_getpass(prompt='Password:', stream=None):
@@ -65,8 +76,8 @@ def upload(dirname, appid):
         yaml = fp.read()
     with open(filename, 'wb') as fp:
         fp.write(re.sub(r'application:\s*\S+', 'application: '+appid, yaml))
-    appcfg.main(['appcfg', 'rollback', dirname])
-    appcfg.main(['appcfg', 'update', dirname])
+    appcfg.main(['appcfg', 'rollback', '--noauth_local_webserver', dirname])
+    appcfg.main(['appcfg', 'update', '--noauth_local_webserver', dirname])
 
 
 def main():
