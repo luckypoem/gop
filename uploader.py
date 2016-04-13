@@ -22,7 +22,7 @@ try:
     os.environ['HTTP_PROXY'] = 'http://127.0.0.1:8087'
     os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:8087'
 except socket.error:
-    println(u'警告：建议先启动 goagent 客户端或者 VPN 然后再上传，如果您的 VPN 已经打开的话，请按回车键继续。')
+    println(u'警告：建议先启动 GoProxy 客户端或者 VPN 然后再上传，如果您的 VPN 已经打开的话，请按回车键继续。')
     raw_input()
 
 
@@ -76,8 +76,12 @@ def upload(dirname, appid):
         yaml = fp.read()
     with open(filename, 'wb') as fp:
         fp.write(re.sub(r'application:\s*\S+', 'application: '+appid, yaml))
-    appcfg.main(['appcfg', 'rollback', '--noauth_local_webserver', dirname])
-    appcfg.main(['appcfg', 'update', '--noauth_local_webserver', dirname])
+    if os.name == 'nt':
+        appcfg.main(['appcfg', 'rollback', dirname])
+        appcfg.main(['appcfg', 'update', dirname])
+    else:
+        appcfg.main(['appcfg', 'rollback', '--noauth_local_webserver', dirname])
+        appcfg.main(['appcfg', 'update', '--noauth_local_webserver', dirname])
 
 
 def main():
@@ -94,9 +98,11 @@ def main():
 
 
 if __name__ == '__main__':
+    if os.name == 'nt':
+        os.system('cls')
     println(u'''\
 ===============================================================
- GoAgent服务端部署程序, 开始上传 gae 应用文件夹
+ GoProxy 服务端部署程序, 开始上传 gae 应用文件夹
  Linux/Mac 用户, 请使用 python uploader.py 来上传应用
 ===============================================================
 
