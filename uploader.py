@@ -13,6 +13,16 @@ sys.dont_write_bytecode = True
 mimetypes._winreg = None
 sys.path.append('google_appengine')
 
+try:
+    filename = './google_appengine/google/appengine/tools/appengine_rpc_httplib2.py'
+    with open(filename, 'rb') as fp:
+        text = fp.read()
+    if '~/.appcfg_oauth2_tokens' in text:
+        with open(filename, 'wb') as fp:
+            fp.write(text.replace('~/.appcfg_oauth2_tokens', './.appcfg_oauth2_tokens'))
+except Exception:
+    pass
+
 def println(s, file=sys.stderr):
     assert type(s) is type(u'')
     file.write(s.encode(sys.getfilesystemencoding(), 'replace') + os.linesep)
