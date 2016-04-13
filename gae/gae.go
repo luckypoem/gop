@@ -149,10 +149,10 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		password := params.Get("X-UrlFetch-Password")
 		switch {
 		case password == "":
-			handlerError(rw, "No Password.", 403)
+			handlerError(rw, "No Password.", http.StatusForbidden)
 			return
 		case password != Password:
-			handlerError(rw, "Wrong Password.", 403)
+			handlerError(rw, "Wrong Password.", http.StatusForbidden)
 			return
 		}
 	}
@@ -180,20 +180,24 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			time.Sleep(time.Second)
 			deadline *= 2
 		case strings.Contains(message, "INVALID_URL"):
-			handlerError(rw, fmt.Sprintf("Invalid URL: %v", err), 501)
+			handlerError(rw, fmt.Sprintf("Invalid URL: %v", err), http.StatusNotImplemented)
 			return
 		case strings.Contains(message, "RESPONSE_TOO_LARGE"):
 			context.Warningf("RESPONSE_TOO_LARGE(type=%T, deadline=%v, url=%v)", err, deadline, req.URL)
 			req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", FetchMaxSize))
 			deadline *= 2
+		case strings.Contains(message, "Over quota"):
+			context.Warningf("Over quota(type=%T, deadline=%v, url=%v)", err, deadline, req.URL)
+			time.Sleep(5 * time.Second)
 		default:
 			context.Warningf("URLFetchServiceError UNKOWN(type=%T, deadline=%v, url=%v, error=%v)", err, deadline, req.URL, err)
-			time.Sleep(4 * time.Second)
+			time.Sleep(2 * time.Second)
 		}
 	}
 
 	if len(errors) == 2 {
-		handlerError(rw, fmt.Sprintf("Go Server Fetch Failed: %v", errors), 502)
+		handlerError(rw, fmt.Sprintf("Go Server Fetch Failed: %v", errors), http.StatusBadGateway)
+		return
 	}
 
 	// Fix missing content-length
@@ -212,7 +216,8 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	var b bytes.Buffer
 	w, err := flate.NewWriter(&b, flate.BestCompression)
 	if err != nil {
-		handlerError(rw, fmt.Sprintf("Go Server Fetch Failed: %v", w), 502)
+		handlerError(rw, fmt.Sprintf("Go Server Fetch Failed: %v", w), http.StatusBadGateway)
+		return
 	}
 
 	fmt.Fprintf(w, "HTTP/1.1 %d %s\r\n", resp.StatusCode, resp.Status)
