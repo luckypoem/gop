@@ -1,2 +1,3 @@
+@pushd "%~dp0"
 @echo Loading GAE SDK...
 @"%~dp0python27.exe" "%~dpn0.py" && exit /b 0 || (pause && exit /b -1)
