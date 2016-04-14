@@ -73,6 +73,8 @@ def _ValidateCertificateHostname(self, cert, hostname):
     return True
 httplib2._ssl_wrap_socket = _ssl_wrap_socket
 httplib2.HTTPSConnectionWithTimeout._ValidateCertificateHostname = _ValidateCertificateHostname
+if hasattr(ssl, '_create_unverified_context'):
+    setattr(ssl, '_create_default_https_context', ssl._create_unverified_context)
 
 from google.appengine.tools import appengine_rpc, appcfg
 
