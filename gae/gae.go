@@ -200,8 +200,14 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fix missing content-length
-	resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
+	// rewise resp.Header
+	resp.Header.Del("Transfer-Encoding")
+	if strings.ToLower(resp.Header.Get("Vary")) == "accept-encoding" {
+		resp.Header.Del("Vary")
+	}
+	if resp.ContentLength > 0 {
+		resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
+	}
 
 	// Fix Set-Cookie header for python client
 	if r.Header.Get("User-Agent") == "" {
