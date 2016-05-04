@@ -23,8 +23,9 @@ const (
 	Version  = "1.0"
 	Password = ""
 
-	FetchMaxSize = 1024 * 1024 * 4
-	Deadline     = 30 * time.Second
+	DefaultFetchMaxSize   = 1024 * 1024 * 4
+	DefaultDeadline       = 10 * time.Second
+	DefaultOverquotaDelay = 4 * time.Second
 )
 
 func ReadRequest(r io.Reader) (req *http.Request, err error) {
@@ -157,46 +158,76 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	deadline := Deadline
-
-	var errors []error
-	var resp *http.Response
-	for i := 0; i < 2; i++ {
-		t := &urlfetch.Transport{Context: context, Deadline: deadline, AllowInvalidServerCertificate: true}
-		resp, err = t.RoundTrip(req)
-		if err == nil {
-			defer resp.Body.Close()
-			break
-		}
-		errors = append(errors, err)
-		message := err.Error()
-		switch {
-		case strings.Contains(message, "FETCH_ERROR"):
-			context.Warningf("FETCH_ERROR(type=%T, deadline=%v, url=%v)", err, deadline, req.URL)
-			time.Sleep(time.Second)
-			deadline *= 2
-		case strings.Contains(message, "DEADLINE_EXCEEDED"):
-			context.Warningf("DEADLINE_EXCEEDED(type=%T, deadline=%v, url=%v)", err, deadline, req.URL)
-			time.Sleep(time.Second)
-			deadline *= 2
-		case strings.Contains(message, "INVALID_URL"):
-			handlerError(rw, fmt.Sprintf("Invalid URL: %v", err), http.StatusNotImplemented)
-			return
-		case strings.Contains(message, "RESPONSE_TOO_LARGE"):
-			context.Warningf("RESPONSE_TOO_LARGE(type=%T, deadline=%v, url=%v)", err, deadline, req.URL)
-			req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", FetchMaxSize))
-			deadline *= 2
-		case strings.Contains(message, "Over quota"):
-			context.Warningf("Over quota(type=%T, deadline=%v, url=%v)", err, deadline, req.URL)
-			time.Sleep(5 * time.Second)
-		default:
-			context.Warningf("URLFetchServiceError UNKOWN(type=%T, deadline=%v, url=%v, error=%v)", err, deadline, req.URL, err)
-			time.Sleep(2 * time.Second)
+	deadline := DefaultDeadline
+	if s := params.Get("X-UrlFetch-Deadline"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil {
+			deadline = time.Duration(n) * time.Second
 		}
 	}
 
-	if len(errors) == 2 {
-		handlerError(rw, fmt.Sprintf("Go Server Fetch Failed: %v", errors), http.StatusBadGateway)
+	overquotaDelay := DefaultOverquotaDelay
+	if s := params.Get("X-UrlFetch-OverquotaDelay"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil {
+			deadline = time.Duration(n) * time.Second
+		}
+	}
+
+	fetchMaxSize := DefaultFetchMaxSize
+	if s := params.Get("X-UrlFetch-MaxSize"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil {
+			fetchMaxSize = n
+		}
+	}
+
+	var resp *http.Response
+	for i := 0; i < 2; i++ {
+		t := &urlfetch.Transport{
+			Context:                       context,
+			Deadline:                      deadline,
+			AllowInvalidServerCertificate: true,
+		}
+
+		resp, err = t.RoundTrip(req)
+		if resp != nil && resp.Body != nil {
+			defer resp.Body.Close()
+		}
+
+		if err != nil {
+			message := err.Error()
+			if strings.Contains(message, "RESPONSE_TOO_LARGE") {
+				context.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+				if s := req.Header.Get("Range"); s != "" {
+					if parts1 := strings.Split(s, "="); len(parts1) == 2 {
+						if parts2 := strings.Split(parts1[1], "-"); len(parts2) == 2 {
+							if start, err := strconv.Atoi(parts2[0]); err == nil {
+								end, err := strconv.Atoi(parts2[1])
+								if err != nil {
+									req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, start+fetchMaxSize))
+								} else {
+									if end-start > fetchMaxSize {
+										req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, start+fetchMaxSize))
+									} else {
+										req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
+									}
+								}
+							}
+						}
+					}
+				} else {
+					req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", fetchMaxSize))
+				}
+			} else if strings.Contains(message, "Over quota") {
+				context.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+				time.Sleep(overquotaDelay)
+			} else {
+				context.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+				break
+			}
+		}
+	}
+
+	if err != nil {
+		handlerError(rw, fmt.Sprintf("Go Server Fetch Failed: %v", err), http.StatusBadGateway)
 		return
 	}
 
