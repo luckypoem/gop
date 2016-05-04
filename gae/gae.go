@@ -24,7 +24,7 @@ const (
 	Password = ""
 
 	DefaultFetchMaxSize   = 1024 * 1024 * 4
-	DefaultDeadline       = 10 * time.Second
+	DefaultDeadline       = 12 * time.Second
 	DefaultOverquotaDelay = 4 * time.Second
 )
 
@@ -188,41 +188,40 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		}
 
 		resp, err = t.RoundTrip(req)
-		if resp != nil && resp.Body != nil {
+		if err == nil {
 			defer resp.Body.Close()
+			break
 		}
 
-		if err != nil {
-			message := err.Error()
-			if strings.Contains(message, "RESPONSE_TOO_LARGE") {
-				context.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-				if s := req.Header.Get("Range"); s != "" {
-					if parts1 := strings.Split(s, "="); len(parts1) == 2 {
-						if parts2 := strings.Split(parts1[1], "-"); len(parts2) == 2 {
-							if start, err := strconv.Atoi(parts2[0]); err == nil {
-								end, err := strconv.Atoi(parts2[1])
-								if err != nil {
+		message := err.Error()
+		if strings.Contains(message, "RESPONSE_TOO_LARGE") {
+			context.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			if s := req.Header.Get("Range"); s != "" {
+				if parts1 := strings.Split(s, "="); len(parts1) == 2 {
+					if parts2 := strings.Split(parts1[1], "-"); len(parts2) == 2 {
+						if start, err1 := strconv.Atoi(parts2[0]); err1 == nil {
+							end, err1 := strconv.Atoi(parts2[1])
+							if err1 != nil {
+								req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, start+fetchMaxSize))
+							} else {
+								if end-start > fetchMaxSize {
 									req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, start+fetchMaxSize))
 								} else {
-									if end-start > fetchMaxSize {
-										req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, start+fetchMaxSize))
-									} else {
-										req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
-									}
+									req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
 								}
 							}
 						}
 					}
-				} else {
-					req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", fetchMaxSize))
 				}
-			} else if strings.Contains(message, "Over quota") {
-				context.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-				time.Sleep(overquotaDelay)
 			} else {
-				context.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-				break
+				req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", fetchMaxSize))
 			}
+		} else if strings.Contains(message, "Over quota") {
+			context.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			time.Sleep(overquotaDelay)
+		} else {
+			context.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			break
 		}
 	}
 
