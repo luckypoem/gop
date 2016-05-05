@@ -2,6 +2,10 @@
 # coding:utf-8
 
 import sys
+if sys.version > '3.':
+    sys.exit(sys.stderr.write('Please run uploader.py by python2\n'))
+
+import sys
 import os
 import re
 import getpass
