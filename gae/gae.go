@@ -1,5 +1,3 @@
-// Copyright 2012 Phus Lu. All rights reserved.
-
 package gae
 
 import (
@@ -24,7 +22,7 @@ const (
 	Password = ""
 
 	DefaultFetchMaxSize   = 1024 * 1024 * 4
-	DefaultDeadline       = 12 * time.Second
+	DefaultDeadline       = 20 * time.Second
 	DefaultOverquotaDelay = 4 * time.Second
 )
 
