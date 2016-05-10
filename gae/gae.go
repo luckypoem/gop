@@ -283,14 +283,13 @@ func root(rw http.ResponseWriter, r *http.Request) {
 	version, _ := strconv.ParseInt(strings.Split(appengine.VersionID(context), ".")[1], 10, 64)
 	ctime := time.Unix(version/(1<<28), 0).Format(time.RFC3339)
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(rw, `
+	fmt.Fprintf(rw, `<!DOCTYPE html>
 <html>
 <head>
 	<title>GoProxy</title>
 </head>
 <body>
 <div>GoProxy server %s works, deployed at %s, latest version is <span id="github"></span></div>
-</body>
 <script type="text/javascript">
 	function callback(commits) {
 		date = commits['data'][0]['commit']['committer']['date']
@@ -298,6 +297,7 @@ func root(rw http.ResponseWriter, r *http.Request) {
 	}
 </script>
 <script src="https://api.github.com/repos/phuslu/goproxy/commits?sha=server.gae&path=gae/gae.go&callback=callback"></script>
+</body>
 </html>
 `, Version, ctime)
 }
