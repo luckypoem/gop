@@ -2,10 +2,17 @@
 # coding:utf-8
 
 import sys
+sys.dont_write_bytecode = True
+
 if sys.version > '3.':
     sys.exit(sys.stderr.write('Please run uploader.py by python2\n'))
 
-import sys
+def println(s, file=sys.stderr):
+    assert type(s) is type(u'')
+    file.write(s.encode(sys.getfilesystemencoding(), 'replace') + os.linesep)
+
+println(u"Loading Google Appengine SDK...")
+
 import os
 import re
 import getpass
@@ -13,12 +20,7 @@ import socket
 import ssl
 import mimetypes
 
-sys.dont_write_bytecode = True
 mimetypes._winreg = None
-
-def println(s, file=sys.stderr):
-    assert type(s) is type(u'')
-    file.write(s.encode(sys.getfilesystemencoding(), 'replace') + os.linesep)
 
 try:
     socket.create_connection(('127.0.0.1', 8087), timeout=1).close()
@@ -54,7 +56,6 @@ def getpass_getpass(prompt='Password:', stream=None):
 getpass.getpass = getpass_getpass
 
 
-println(u"Loading Google Appengine SDK...")
 sys.path.append('google_appengine')
 try:
     filename = './google_appengine/google/appengine/tools/appengine_rpc_httplib2.py'
