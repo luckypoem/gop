@@ -2,6 +2,7 @@
 # coding:utf-8
 
 import sys
+import os
 sys.dont_write_bytecode = True
 
 if sys.version > '3.':
@@ -13,7 +14,6 @@ def println(s, file=sys.stderr):
 
 println(u"Loading Google Appengine SDK...")
 
-import os
 import re
 import getpass
 import socket
