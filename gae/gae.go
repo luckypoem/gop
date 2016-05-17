@@ -241,7 +241,11 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("User-Agent") == "" {
 		const cookieHeader string = "Set-Cookie"
 		if resp.Header.Get(cookieHeader) != "" {
-			resp.Header[cookieHeader] = []string{strings.Join(resp.Header[cookieHeader], ", ")}
+			cookies := make([]string, 0)
+			for _, c := range resp.Cookies() {
+				cookies = append(cookies, c.String())
+			}
+			resp.Header[cookieHeader] = []string{strings.Join(cookies, ", ")}
 		}
 	}
 
