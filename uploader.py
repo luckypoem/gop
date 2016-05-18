@@ -2,18 +2,15 @@
 # coding:utf-8
 
 import sys
-import os
+
 sys.dont_write_bytecode = True
 
 if sys.version > '3.':
     sys.exit(sys.stderr.write('Please run uploader.py by python2\n'))
 
-def println(s, file=sys.stderr):
-    assert type(s) is type(u'')
-    file.write(s.encode(sys.getfilesystemencoding(), 'replace') + os.linesep)
+sys.stderr.write('Loading Google Appengine SDK...')
 
-println(u"Loading Google Appengine SDK...")
-
+import os
 import re
 import getpass
 import socket
@@ -21,6 +18,10 @@ import ssl
 import mimetypes
 
 mimetypes._winreg = None
+
+def println(s, file=sys.stderr):
+    assert type(s) is type(u'')
+    file.write(s.encode(sys.getfilesystemencoding(), 'replace') + os.linesep)
 
 try:
     socket.create_connection(('127.0.0.1', 8087), timeout=1).close()
