@@ -82,19 +82,28 @@ func ReadRequest(r io.Reader) (req *http.Request, err error) {
 	return
 }
 
-func handlerError(rw http.ResponseWriter, html string, code int) {
+func fmtError(err error) string {
+	return fmt.Sprintf(`{
+    "endpoint": "appengine",
+    "error": "%s"
+}
+`, err.Error())
+}
+
+func handlerError(rw http.ResponseWriter, err error, code int) {
 	var b bytes.Buffer
-	w, err := flate.NewWriter(&b, flate.BestCompression)
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusBadGateway)
+	w, err1 := flate.NewWriter(&b, flate.BestCompression)
+	if err1 != nil {
+		http.Error(rw, fmtError(err1), http.StatusBadGateway)
 		return
 	}
 
+	data := fmtError(err)
 	fmt.Fprintf(w, "HTTP/1.1 %d\r\n", code)
-	fmt.Fprintf(w, "Content-Type: text/html; charset=utf-8\r\n")
-	fmt.Fprintf(w, "Content-Length: %d\r\n", len(html))
+	fmt.Fprintf(w, "Content-Type: text/plain; charset=utf-8\r\n")
+	fmt.Fprintf(w, "Content-Length: %d\r\n", len(data))
 	io.WriteString(w, "\r\n")
-	io.WriteString(w, html)
+	io.WriteString(w, data)
 	w.Close()
 
 	b0 := []byte{0, 0}
@@ -115,14 +124,14 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	var hdrLen uint16
 	if err := binary.Read(r.Body, binary.BigEndian, &hdrLen); err != nil {
 		context.Criticalf("binary.Read(&hdrLen) return %v", err)
-		handlerError(rw, err.Error(), http.StatusBadRequest)
+		handlerError(rw, err, http.StatusBadRequest)
 		return
 	}
 
 	req, err := ReadRequest(bufio.NewReader(flate.NewReader(&io.LimitedReader{R: r.Body, N: int64(hdrLen)})))
 	if err != nil {
 		context.Criticalf("http.ReadRequest(%#v) return %#v", r.Body, err)
-		handlerError(rw, err.Error(), http.StatusBadRequest)
+		handlerError(rw, err, http.StatusBadRequest)
 		return
 	}
 
@@ -148,10 +157,10 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		password := params.Get("X-UrlFetch-Password")
 		switch {
 		case password == "":
-			handlerError(rw, "No Password.", http.StatusForbidden)
+			handlerError(rw, fmt.Errorf("No Password."), http.StatusForbidden)
 			return
 		case password != Password:
-			handlerError(rw, "Wrong Password.", http.StatusForbidden)
+			handlerError(rw, fmt.Errorf("Wrong Password."), http.StatusForbidden)
 			return
 		}
 	}
@@ -224,7 +233,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		handlerError(rw, fmt.Sprintf("Go Server Fetch Failed: %v", err), http.StatusBadGateway)
+		handlerError(rw, err, http.StatusBadGateway)
 		return
 	}
 
@@ -254,7 +263,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	var b bytes.Buffer
 	w, err := flate.NewWriter(&b, flate.BestCompression)
 	if err != nil {
-		handlerError(rw, fmt.Sprintf("Go Server Fetch Failed: %v", w), http.StatusBadGateway)
+		handlerError(rw, err, http.StatusBadGateway)
 		return
 	}
 
