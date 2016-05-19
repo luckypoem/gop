@@ -82,23 +82,25 @@ func ReadRequest(r io.Reader) (req *http.Request, err error) {
 	return
 }
 
-func fmtError(err error) string {
+func fmtError(c appengine.Context, err error) string {
 	return fmt.Sprintf(`{
-    "endpoint": "appengine",
+    "type": "appengine",
+    "host": "%s",
+    "software": "%s",
     "error": "%s"
 }
-`, err.Error())
+`, appengine.DefaultVersionHostname(c), appengine.ServerSoftware(), err.Error())
 }
 
-func handlerError(rw http.ResponseWriter, err error, code int) {
+func handlerError(c appengine.Context, rw http.ResponseWriter, err error, code int) {
 	var b bytes.Buffer
 	w, err1 := flate.NewWriter(&b, flate.BestCompression)
 	if err1 != nil {
-		http.Error(rw, fmtError(err1), http.StatusBadGateway)
+		http.Error(rw, fmtError(c, err1), http.StatusBadGateway)
 		return
 	}
 
-	data := fmtError(err)
+	data := fmtError(c, err)
 	fmt.Fprintf(w, "HTTP/1.1 %d\r\n", code)
 	fmt.Fprintf(w, "Content-Type: text/plain; charset=utf-8\r\n")
 	fmt.Fprintf(w, "Content-Length: %d\r\n", len(data))
@@ -118,20 +120,20 @@ func handlerError(rw http.ResponseWriter, err error, code int) {
 
 func handler(rw http.ResponseWriter, r *http.Request) {
 	var err error
-	context := appengine.NewContext(r)
-	context.Infof("Hanlde Request=%#v\n", r)
+	c := appengine.NewContext(r)
+	c.Infof("Hanlde Request=%#v\n", r)
 
 	var hdrLen uint16
 	if err := binary.Read(r.Body, binary.BigEndian, &hdrLen); err != nil {
-		context.Criticalf("binary.Read(&hdrLen) return %v", err)
-		handlerError(rw, err, http.StatusBadRequest)
+		c.Criticalf("binary.Read(&hdrLen) return %v", err)
+		handlerError(c, rw, err, http.StatusBadRequest)
 		return
 	}
 
 	req, err := ReadRequest(bufio.NewReader(flate.NewReader(&io.LimitedReader{R: r.Body, N: int64(hdrLen)})))
 	if err != nil {
-		context.Criticalf("http.ReadRequest(%#v) return %#v", r.Body, err)
-		handlerError(rw, err, http.StatusBadRequest)
+		c.Criticalf("http.ReadRequest(%#v) return %#v", r.Body, err)
+		handlerError(c, rw, err, http.StatusBadRequest)
 		return
 	}
 
@@ -151,16 +153,16 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	}
 	// req.Header.Del("X-Cloud-Trace-Context")
 
-	context.Infof("Parsed Request=%#v\n", req)
+	c.Infof("Parsed Request=%#v\n", req)
 
 	if Password != "" {
 		password := params.Get("X-UrlFetch-Password")
 		switch {
 		case password == "":
-			handlerError(rw, fmt.Errorf("No Password."), http.StatusForbidden)
+			handlerError(c, rw, fmt.Errorf("No Password."), http.StatusForbidden)
 			return
 		case password != Password:
-			handlerError(rw, fmt.Errorf("Wrong Password."), http.StatusForbidden)
+			handlerError(c, rw, fmt.Errorf("Wrong Password."), http.StatusForbidden)
 			return
 		}
 	}
@@ -189,7 +191,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	var resp *http.Response
 	for i := 0; i < 2; i++ {
 		t := &urlfetch.Transport{
-			Context:                       context,
+			Context:                       c,
 			Deadline:                      deadline,
 			AllowInvalidServerCertificate: true,
 		}
@@ -202,7 +204,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 
 		message := err.Error()
 		if strings.Contains(message, "RESPONSE_TOO_LARGE") {
-			context.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			if s := req.Header.Get("Range"); s != "" {
 				if parts1 := strings.Split(s, "="); len(parts1) == 2 {
 					if parts2 := strings.Split(parts1[1], "-"); len(parts2) == 2 {
@@ -224,16 +226,16 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 				req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", fetchMaxSize))
 			}
 		} else if strings.Contains(message, "Over quota") {
-			context.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(overquotaDelay)
 		} else {
-			context.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			c.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			break
 		}
 	}
 
 	if err != nil {
-		handlerError(rw, err, http.StatusBadGateway)
+		handlerError(c, rw, err, http.StatusBadGateway)
 		return
 	}
 
@@ -258,12 +260,12 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	context.Infof("Write Response=%#v\n", resp)
+	c.Infof("Write Response=%#v\n", resp)
 
 	var b bytes.Buffer
 	w, err := flate.NewWriter(&b, flate.BestCompression)
 	if err != nil {
-		handlerError(rw, err, http.StatusBadGateway)
+		handlerError(c, rw, err, http.StatusBadGateway)
 		return
 	}
 

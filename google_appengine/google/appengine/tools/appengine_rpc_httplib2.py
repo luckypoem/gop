@@ -388,7 +388,7 @@ class HttpRpcServerOAuth2(HttpRpcServerHttpLib2):
 
     if save_cookies:
       oauth2_credential_file = (oauth2_parameters.credential_file
-                                or '~/.appcfg_oauth2_tokens')
+                                or './.appcfg_oauth2_tokens')
       self.storage = oauth2client_file.Storage(
           os.path.expanduser(oauth2_credential_file))
     else:
