@@ -24,6 +24,7 @@ const (
 	DefaultFetchMaxSize   = 1024 * 1024 * 4
 	DefaultDeadline       = 20 * time.Second
 	DefaultOverquotaDelay = 4 * time.Second
+	DefaultSSLVerify      = false
 )
 
 func ReadRequest(r io.Reader) (req *http.Request, err error) {
@@ -188,12 +189,19 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	sslVerify := DefaultSSLVerify
+	if s := params.Get("X-UrlFetch-SSLVerify"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			sslVerify = true
+		}
+	}
+
 	var resp *http.Response
 	for i := 0; i < 2; i++ {
 		t := &urlfetch.Transport{
 			Context:                       c,
 			Deadline:                      deadline,
-			AllowInvalidServerCertificate: true,
+			AllowInvalidServerCertificate: !sslVerify,
 		}
 
 		resp, err = t.RoundTrip(req)
