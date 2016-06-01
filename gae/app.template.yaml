@@ -6,3 +6,7 @@ api_version: go1
 handlers:
 - url: /.*
   script: _go_app
+
+error_handlers:
+  - error_code: over_quota
+    file: error_over_quota.txt
