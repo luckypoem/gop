@@ -19,6 +19,12 @@ import mimetypes
 
 mimetypes._winreg = None
 
+def clear():
+    if os.name == 'nt':
+        os.system('cls')
+    else:
+        sys.stderr.write("\x1b[2J\x1b[H")
+
 def println(s, file=sys.stderr):
     assert type(s) is type(u'')
     file.write(s.encode(sys.getfilesystemencoding(), 'replace') + os.linesep)
@@ -28,6 +34,7 @@ try:
     os.environ['HTTP_PROXY'] = 'http://127.0.0.1:8087'
     os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:8087'
 except socket.error:
+    clear()
     println(u'警告：建议先启动 GoProxy 客户端或者 VPN 然后再上传，如果您的 VPN 已经打开的话，请按回车键继续。')
     raw_input()
 
@@ -115,8 +122,7 @@ def main():
 
 
 if __name__ == '__main__':
-    if os.name == 'nt':
-        os.system('cls')
+    clear()
     println(u'''\
 ===============================================================
  GoProxy 服务端部署程序, 开始上传 gae 应用文件夹
