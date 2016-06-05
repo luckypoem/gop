@@ -95,11 +95,7 @@ func fmtError(c appengine.Context, err error) string {
 
 func handlerError(c appengine.Context, rw http.ResponseWriter, err error, code int) {
 	var b bytes.Buffer
-	w, err1 := flate.NewWriter(&b, flate.BestCompression)
-	if err1 != nil {
-		http.Error(rw, fmtError(c, err1), http.StatusBadGateway)
-		return
-	}
+	w, _ := flate.NewWriter(&b, flate.BestCompression)
 
 	data := fmtError(c, err)
 	fmt.Fprintf(w, "HTTP/1.1 %d\r\n", code)
