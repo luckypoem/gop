@@ -7,8 +7,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -298,27 +300,33 @@ func robots(rw http.ResponseWriter, r *http.Request) {
 }
 
 func root(rw http.ResponseWriter, r *http.Request) {
-	context := appengine.NewContext(r)
-	version, _ := strconv.ParseInt(strings.Split(appengine.VersionID(context), ".")[1], 10, 64)
+	c := appengine.NewContext(r)
+
+	version, _ := strconv.ParseInt(strings.Split(appengine.VersionID(c), ".")[1], 10, 64)
 	ctime := time.Unix(version/(1<<28), 0).Format(time.RFC3339)
-	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(rw, `<!DOCTYPE html>
-<html>
-<head>
-	<title>GoProxy</title>
-</head>
-<body>
-<div>GoProxy server %s works, deployed at %s, latest version is <span id="github"></span></div>
-<script type="text/javascript">
-	function callback(commits) {
-		date = commits['data'][0]['commit']['committer']['date']
-		document.getElementById('github').innerHTML = date
+
+	var latest string
+	t := &urlfetch.Transport{Context: c}
+	req, _ := http.NewRequest("GET", "https://github.com/phuslu/goproxy/blob/server.gae/gae/gae.go", nil)
+	resp, err := t.RoundTrip(req)
+	if err != nil {
+		latest = err.Error()
+	} else {
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			latest = err.Error()
+		} else {
+			latest = regexp.MustCompile(`\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ`).FindString(string(data))
+		}
 	}
-</script>
-<script src="https://api.github.com/repos/phuslu/goproxy/commits?sha=server.gae&path=gae/gae.go&callback=callback"></script>
-</body>
-</html>
-`, Version, ctime)
+
+	rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintf(rw, `{
+	"server": "goproxy %s"
+	"deploy": "%s",
+	"latest": "%s"
+}
+`, Version, ctime, latest)
 }
 
 func init() {
