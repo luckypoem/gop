@@ -94,12 +94,10 @@ from google.appengine.tools import appengine_rpc, appcfg
 def upload(dirname, appid):
     assert isinstance(dirname, basestring) and isinstance(appid, basestring)
     filename = os.path.join(dirname, 'app.yaml')
-    template_filename = os.path.join(dirname, 'app.template.yaml')
-    assert os.path.isfile(template_filename), u'%s not exists!' % template_filename
-    with open(template_filename, 'rb') as fp:
-        yaml = fp.read()
+    with open(filename, 'rb') as fp:
+        content = fp.read()
     with open(filename, 'wb') as fp:
-        fp.write(re.sub(r'application:\s*\S+', 'application: '+appid, yaml))
+        fp.write(re.sub(r'application:\s*\S+', 'application: '+appid, content))
     if os.name == 'nt':
         appcfg.main(['appcfg', 'rollback', dirname])
         appcfg.main(['appcfg', 'update', dirname])
