@@ -5,11 +5,13 @@ import (
 	"bytes"
 	"compress/flate"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -203,6 +205,15 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		}
 
 		resp, err = t.RoundTrip(req)
+		if resp != nil && resp.Body != nil {
+			if v := reflect.ValueOf(resp.Body).Elem().FieldByName("truncated"); v.IsValid() {
+				if truncated := v.Bool(); truncated {
+					resp.Body.Close()
+					err = errors.New("URLFetchServiceError_RESPONSE_TOO_LARGE")
+				}
+			}
+		}
+
 		if err == nil {
 			defer resp.Body.Close()
 			break
