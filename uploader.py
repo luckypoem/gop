@@ -82,18 +82,13 @@ def _ssl_wrap_socket(sock, key_file, cert_file,
     return ssl.wrap_socket(sock, keyfile=key_file, certfile=cert_file,
                            cert_reqs=ssl.CERT_NONE, ca_certs=None,
                            ssl_version=ssl.PROTOCOL_TLSv1)
-def _ValidateCertificateHostname(self, cert, hostname):
-    return True
 httplib2._ssl_wrap_socket = _ssl_wrap_socket
-httplib2.HTTPSConnectionWithTimeout._ValidateCertificateHostname = _ValidateCertificateHostname
+httplib2.HTTPSConnectionWithTimeout._ValidateCertificateHostname = lambda a, b, c: True
 if hasattr(ssl, '_create_unverified_context'):
     setattr(ssl, '_create_default_https_context', ssl._create_unverified_context)
 
-# del protobuf's google modules
-# before import google from appengine
-if 'google' in sys.modules:
-    del sys.modules['google']
-
+# del protobuf's google modules before import google from appengine
+sys.modules.pop('google', None)
 from google.appengine.tools import appengine_rpc, appcfg
 
 def upload(dirname, appid):
