@@ -88,7 +88,7 @@ if hasattr(ssl, '_create_unverified_context'):
     setattr(ssl, '_create_default_https_context', ssl._create_unverified_context)
 
 # del protobuf's google modules before import google from appengine
-sys.modules.pop('google', None)
+# sys.modules.pop('google', None)
 from google.appengine.tools import appengine_rpc, appcfg
 
 def upload(dirname, appid):
