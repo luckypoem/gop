@@ -64,7 +64,7 @@ def getpass_getpass(prompt='Password:', stream=None):
 getpass.getpass = getpass_getpass
 
 
-sys.path.append('google_appengine')
+sys.path = ['google_appengine'] + sys.path
 try:
     filename = './google_appengine/google/appengine/tools/appengine_rpc_httplib2.py'
     with open(filename, 'rb') as fp:
