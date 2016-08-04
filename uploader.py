@@ -89,6 +89,11 @@ httplib2.HTTPSConnectionWithTimeout._ValidateCertificateHostname = _ValidateCert
 if hasattr(ssl, '_create_unverified_context'):
     setattr(ssl, '_create_default_https_context', ssl._create_unverified_context)
 
+# del protobuf's google modules
+# before import google from appengine
+if 'google' in sys.modules:
+    del sys.modules['google']
+
 from google.appengine.tools import appengine_rpc, appcfg
 
 def upload(dirname, appid):
