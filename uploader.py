@@ -36,6 +36,7 @@ try:
 except socket.error:
     clear()
     println(u'警告：建议先启动 GoProxy 客户端或者 VPN 然后再上传，如果您的 VPN 已经打开的话，请按回车键继续。')
+    println(u'注意：上传时请保持 GoProxy 在默认端口 (8087) 监听。')
     raw_input()
 
 
