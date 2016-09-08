@@ -25,10 +25,11 @@ const (
 	Version  = "1.0"
 	Password = ""
 
-	DefaultFetchMaxSize   = 1024 * 1024 * 4
-	DefaultDeadline       = 20 * time.Second
-	DefaultOverquotaDelay = 4 * time.Second
-	DefaultSSLVerify      = false
+	DefaultFetchMaxSize        = 1024 * 1024 * 4
+	DefaultDeadline            = 20 * time.Second
+	DefaultOverquotaDelay      = 4 * time.Second
+	DefaultURLFetchClosedDelay = 1 * time.Second
+	DefaultSSLVerify           = false
 )
 
 func IsBinary(b []byte) bool {
@@ -200,7 +201,14 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	overquotaDelay := DefaultOverquotaDelay
 	if s := params.Get("X-UrlFetch-OverquotaDelay"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil {
-			deadline = time.Duration(n) * time.Second
+			overquotaDelay = time.Duration(n) * time.Second
+		}
+	}
+
+	urlfetchClosedDelay := DefaultURLFetchClosedDelay
+	if s := params.Get("X-UrlFetch-URLFetchClosedDelay"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil {
+			urlfetchClosedDelay = time.Duration(n) * time.Second
 		}
 	}
 
@@ -267,6 +275,9 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		} else if strings.Contains(message, "Over quota") {
 			c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(overquotaDelay)
+		} else if strings.Contains(message, "urlfetch: CLOSED") {
+			c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			time.Sleep(urlfetchClosedDelay)
 		} else {
 			c.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			break
