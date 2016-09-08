@@ -35,6 +35,9 @@ func IsBinary(b []byte) bool {
 	if len(b) > 32 {
 		b = b[:32]
 	}
+	if bytes.HasPrefix(b, []byte{0xef, 0xbb, 0xbf}) {
+		return false
+	}
 	for _, c := range b {
 		if c == '\n' {
 			break
