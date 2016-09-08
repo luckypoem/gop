@@ -50,7 +50,7 @@ func IsBinary(b []byte) bool {
 }
 
 func IsGzip(b []byte) bool {
-	return bytes.HasPrefix(b, []byte("\x1f\x8b\x08\x00\x00"))
+	return bytes.HasPrefix(b, []byte{0x1f, 0x8b, 0x08, 0x00, 0x00})
 }
 
 func ReadRequest(r io.Reader) (req *http.Request, err error) {
