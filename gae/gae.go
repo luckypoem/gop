@@ -381,12 +381,22 @@ func root(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	var message string
+	switch {
+	case latest == "":
+		message = "unable check goproxy latest version, please try after 5 minutes."
+	case latest <= ctime:
+		message = "already update to latest."
+	default:
+		message = "please update this server"
+	}
 	fmt.Fprintf(rw, `{
 	"server": "goproxy %s"
+	"latest": "%s",
 	"deploy": "%s",
-	"latest": "%s"
+	"message": "%s"
 }
-`, Version, ctime, latest)
+`, Version, latest, ctime, message)
 }
 
 func init() {
