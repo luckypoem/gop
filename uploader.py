@@ -2,6 +2,7 @@
 # coding:utf-8
 
 import sys
+import os
 
 sys.dont_write_bytecode = True
 
@@ -9,8 +10,8 @@ if sys.version > '3.':
     sys.exit(sys.stderr.write('Please run uploader.py by python2\n'))
 
 sys.stderr.write('Loading Google Appengine SDK...')
+os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
-import os
 import re
 import getpass
 import socket
@@ -113,7 +114,6 @@ def main():
     if any(x in appids.lower() for x in ('ios', 'android', 'mobile')):
         println(u'appid 不能包含 ios/android/mobile 等字样。')
         sys.exit(-1)
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
     for appid in appids.split('|'):
         upload('gae', appid)
 
