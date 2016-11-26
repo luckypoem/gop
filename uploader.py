@@ -9,7 +9,6 @@ sys.dont_write_bytecode = True
 if sys.version > '3.':
     sys.exit(sys.stderr.write('Please run uploader.py by python2\n'))
 
-sys.stderr.write('Loading Google Appengine SDK...')
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
 import re
@@ -31,14 +30,23 @@ def println(s, file=sys.stderr):
     file.write(s.encode(sys.getfilesystemencoding(), 'replace') + os.linesep)
 
 try:
-    socket.create_connection(('127.0.0.1', 8087), timeout=1).close()
+    socket.create_connection(('127.0.0.1', 8087), timeout=0.5).close()
     os.environ['HTTP_PROXY'] = 'http://127.0.0.1:8087'
     os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:8087'
 except socket.error:
-    clear()
-    println(u'警告：建议先启动 GoProxy 客户端或者 VPN 然后再上传，如果您的 VPN 已经打开的话，请按回车键继续。')
-    println(u'注意：上传时请保持 GoProxy 在默认端口 (8087) 监听。')
-    raw_input()
+    try:
+        socket.create_connection(('127.0.0.1', 1080), timeout=0.5).close()
+        sys.path.append('PySocks')
+        import socks
+        if os.name == 'nt':
+            import win_inet_pton
+        socks.set_default_proxy(socks.SOCKS5, '127.0.0.1', port=1080)
+        socket.socket = socks.socksocket
+        println(u'Using socks5 proxy on 127.0.0.1:1080')
+    except socket.error:
+        println(u'警告：建议先启动 GoProxy 客户端或者 VPN 然后再上传，如果您的 VPN 已经打开的话，请按回车键继续。')
+        println(u'注意：上传时请保持 GoProxy 在默认端口 (8087) 监听。')
+        raw_input()
 
 
 _realgetpass = getpass.getpass
@@ -89,7 +97,8 @@ httplib2.HTTPSConnectionWithTimeout._ValidateCertificateHostname = lambda a, b, 
 if hasattr(ssl, '_create_unverified_context'):
     setattr(ssl, '_create_default_https_context', ssl._create_unverified_context)
 
-from google_appengine.google.appengine.tools import appengine_rpc, appcfg
+println(u'Loading Google Appengine SDK...')
+from google_appengine.google.appengine.tools import appcfg
 
 def upload(dirname, appid):
     assert isinstance(dirname, basestring) and isinstance(appid, basestring)
