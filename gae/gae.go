@@ -335,7 +335,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "HTTP/1.1 %d %s\r\n", resp.StatusCode, resp.Status)
+	fmt.Fprintf(w, "HTTP/1.1 %s\r\n", resp.Status)
 	resp.Header.Write(w)
 	io.WriteString(w, "\r\n")
 	w.Close()
