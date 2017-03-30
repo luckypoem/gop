@@ -752,7 +752,7 @@ class ProxyInfo(object):
         self.proxy_type = proxy_type
         self.proxy_host = proxy_host
         self.proxy_port = proxy_port
-        self.proxy_rdns = proxy_rdns
+        self.proxy_rdns = True
         self.proxy_user = proxy_user
         self.proxy_pass = proxy_pass
 
