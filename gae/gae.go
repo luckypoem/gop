@@ -32,28 +32,6 @@ const (
 	DefaultSSLVerify           = false
 )
 
-func IsBinary(b []byte) bool {
-	if len(b) > 32 {
-		b = b[:32]
-	}
-	if bytes.HasPrefix(b, []byte{0xef, 0xbb, 0xbf}) {
-		return false
-	}
-	for _, c := range b {
-		if c == '\n' {
-			break
-		}
-		if c > 0x7f {
-			return true
-		}
-	}
-	return false
-}
-
-func IsGzip(b []byte) bool {
-	return bytes.HasPrefix(b, []byte{0x1f, 0x8b, 0x08, 0x00, 0x00})
-}
-
 func ReadRequest(r io.Reader) (req *http.Request, err error) {
 	req = new(http.Request)
 
@@ -297,22 +275,23 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	if resp.ContentLength > 0 {
 		resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
 	}
-	if resp.Header.Get("Content-Encoding") == "" {
-		if s := resp.Header.Get("Content-Type"); strings.HasPrefix(s, "text/") ||
-			strings.HasPrefix(s, "application/json") ||
-			strings.HasPrefix(s, "application/x-javascript") ||
-			strings.HasPrefix(s, "application/javascript") {
-			if v := reflect.ValueOf(resp.Body).Elem().FieldByName("content"); v.IsValid() {
-				b := v.Bytes()
-				switch {
-				case IsGzip(b):
-					resp.Header.Set("Content-Encoding", "gzip")
-				case IsBinary(b) && strings.Contains(req.Header.Get("Accept-Encoding"), "deflate"):
-					resp.Header.Set("Content-Encoding", "deflate")
-				}
-			}
-		}
-	}
+
+	// if resp.Header.Get("Content-Encoding") == "" {
+	// 	if s := resp.Header.Get("Content-Type"); strings.HasPrefix(s, "text/") ||
+	// 		strings.HasPrefix(s, "application/json") ||
+	// 		strings.HasPrefix(s, "application/x-javascript") ||
+	// 		strings.HasPrefix(s, "application/javascript") {
+	// 		if v := reflect.ValueOf(resp.Body).Elem().FieldByName("content"); v.IsValid() {
+	// 			b := v.Bytes()
+	// 			switch {
+	// 			case IsGzip(b):
+	// 				resp.Header.Set("Content-Encoding", "gzip")
+	// 			case IsBinary(b) && strings.Contains(req.Header.Get("Accept-Encoding"), "deflate"):
+	// 				resp.Header.Set("Content-Encoding", "deflate")
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	// Fix Set-Cookie header for python client
 	// if r.Header.Get("User-Agent") == "" {
