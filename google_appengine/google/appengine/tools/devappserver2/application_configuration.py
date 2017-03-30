@@ -24,7 +24,6 @@ import datetime
 import errno
 import logging
 import os
-import os.path
 import random
 import string
 import threading
@@ -36,10 +35,8 @@ from google.appengine.api import backendinfo
 from google.appengine.api import dispatchinfo
 from google.appengine.client.services import port_manager
 from google.appengine.tools import app_engine_web_xml_parser
-from google.appengine.tools import java_quickstart
 from google.appengine.tools import queue_xml_parser
 from google.appengine.tools import web_xml_parser
-from google.appengine.tools import xml_parser_utils
 from google.appengine.tools import yaml_translator
 from google.appengine.tools.devappserver2 import errors
 
@@ -96,7 +93,8 @@ class ModuleConfiguration(object):
       ('manual_scaling', 'manual_scaling'),
       ('automatic_scaling', 'automatic_scaling')]
 
-  def __init__(self, config_path, app_id=None):
+  def __init__(self, config_path, app_id=None, runtime=None,
+               env_variables=None):
     """Initializer for ModuleConfiguration.
 
     Args:
@@ -104,10 +102,16 @@ class ModuleConfiguration(object):
           containing the configuration for this module.
       app_id: A string that is the application id, or None if the application id
           from the yaml or xml file should be used.
+      runtime: A string that is the runtime to use, or None if the runtime
+          from the yaml or xml file should be used.
+      env_variables: A dictionary that is the environment variables passed by
+          flags.
 
     Raises:
       errors.DockerfileError: Raised if a user supplied a Dockerfile and a
         non-custom runtime.
+      errors.InvalidAppConfigError: Raised if a user select python
+        vanilla runtime.
     """
     self._config_path = config_path
     self._forced_app_id = app_id
@@ -131,6 +135,13 @@ class ModuleConfiguration(object):
     if self._app_info_external.service:
       self._app_info_external.module = self._app_info_external.service
 
+    # This if-statement is necessary because of following corner case
+    # appinfo.EnvironmentVariables.Merge({}, None) returns None
+    if env_variables:
+      merged_env_variables = appinfo.EnvironmentVariables.Merge(
+          self._app_info_external.env_variables, env_variables)
+      self._app_info_external.env_variables = merged_env_variables
+
     self._mtimes = self._get_mtimes(files_to_check)
     self._application = '%s~%s' % (self.partition,
                                    self.application_external_name)
@@ -141,7 +152,7 @@ class ModuleConfiguration(object):
     self._basic_scaling = self._app_info_external.basic_scaling
     self._manual_scaling = self._app_info_external.manual_scaling
     self._automatic_scaling = self._app_info_external.automatic_scaling
-    self._runtime = self._app_info_external.runtime
+    self._runtime = runtime or self._app_info_external.runtime
     self._effective_runtime = self._app_info_external.GetEffectiveRuntime()
 
     dockerfile_dir = os.path.dirname(self._config_path)
@@ -168,6 +179,12 @@ class ModuleConfiguration(object):
 
     self._forwarded_ports = {}
     if self.runtime == 'vm':
+      # Avoid using python-vanilla with dev_appserver
+      if 'python' == self._effective_runtime:
+        raise errors.InvalidAppConfigError('Under dev_appserver, '
+                                           'runtime:python is not supported '
+                                           'for Flexible environment.')
+
       # Java uses an api_version of 1.0 where everyone else uses just 1.
       # That doesn't matter much elsewhere, but it does pain us with VMs
       # because they recognize api_version 1 not 1.0.
@@ -451,20 +468,10 @@ class ModuleConfiguration(object):
         app_engine_web_xml_parser.AppEngineWebXmlParser().ProcessXml(
             app_engine_web_xml_str))
 
-    quickstart = xml_parser_utils.BooleanValue(
-        app_engine_web_xml.beta_settings.get('java_quickstart', 'false'))
-
     web_inf_dir = os.path.dirname(app_engine_web_xml_path)
-    if quickstart:
-      app_dir = os.path.dirname(web_inf_dir)
-      web_xml_str, web_xml_path = java_quickstart.quickstart_generator(app_dir)
-      webdefault_xml_str = java_quickstart.get_webdefault_xml()
-      web_xml_str = java_quickstart.remove_mappings(
-          web_xml_str, webdefault_xml_str)
-    else:
-      web_xml_path = os.path.join(web_inf_dir, 'web.xml')
-      with open(web_xml_path) as f:
-        web_xml_str = f.read()
+    web_xml_path = os.path.join(web_inf_dir, 'web.xml')
+    with open(web_xml_path) as f:
+      web_xml_str = f.read()
 
     has_jsps = False
     for _, _, filenames in os.walk(self.application_root):
@@ -523,7 +530,9 @@ def _set_health_check_defaults(health_check):
 class BackendsConfiguration(object):
   """Stores configuration information for a backends.yaml file."""
 
-  def __init__(self, app_config_path, backend_config_path, app_id=None):
+  def __init__(
+      self, app_config_path, backend_config_path, app_id=None, runtime=None,
+      env_variables=None):
     """Initializer for BackendsConfiguration.
 
     Args:
@@ -533,10 +542,14 @@ class BackendsConfiguration(object):
           backends.yaml file containing the configuration for backends.
       app_id: A string that is the application id, or None if the application id
           from the yaml or xml file should be used.
+      runtime: A string that is the runtime to use, or None if the runtime
+          from the yaml or xml file should be used.
+      env_variables: A dictionary that is the environment variables passed by
+          flags.
     """
     self._update_lock = threading.RLock()
     self._base_module_configuration = ModuleConfiguration(
-        app_config_path, app_id)
+        app_config_path, app_id, runtime, env_variables)
     backend_info_external = self._parse_configuration(
         backend_config_path)
 
@@ -794,7 +807,8 @@ class DispatchConfiguration(object):
 class ApplicationConfiguration(object):
   """Stores application configuration information."""
 
-  def __init__(self, config_paths, app_id=None):
+  def __init__(self, config_paths, app_id=None, runtime=None,
+               env_variables=None):
     """Initializer for ApplicationConfiguration.
 
     Args:
@@ -802,6 +816,11 @@ class ApplicationConfiguration(object):
           or to directories containing them.
       app_id: A string that is the application id, or None if the application id
           from the yaml or xml file should be used.
+      runtime: A string that is the runtime to use, or None if the runtime
+          from the yaml or xml file should be used.
+      env_variables: A dictionary that is the environment variables passed by
+          flags.
+
     Raises:
       InvalidAppConfigError: On invalid configuration.
     """
@@ -818,9 +837,9 @@ class ApplicationConfiguration(object):
         # TODO: Reuse the ModuleConfiguration created for the app.yaml
         # instead of creating another one for the same file.
         app_yaml = config_path.replace('backends.y', 'app.y')
-        self.modules.extend(
-            BackendsConfiguration(
-                app_yaml, config_path, app_id).get_backend_configurations())
+        backends = BackendsConfiguration(app_yaml, config_path, app_id, runtime,
+                                         env_variables)
+        self.modules.extend(backends.get_backend_configurations())
       elif (config_path.endswith('dispatch.yaml') or
             config_path.endswith('dispatch.yml')):
         if self.dispatch:
@@ -828,7 +847,9 @@ class ApplicationConfiguration(object):
               'Multiple dispatch.yaml files specified')
         self.dispatch = DispatchConfiguration(config_path)
       else:
-        module_configuration = ModuleConfiguration(config_path, app_id)
+        module_configuration = ModuleConfiguration(config_path, app_id, runtime,
+                                                   env_variables)
+
         self.modules.append(module_configuration)
     application_ids = set(module.application
                           for module in self.modules)

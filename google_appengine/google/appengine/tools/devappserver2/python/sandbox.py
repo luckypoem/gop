@@ -42,11 +42,12 @@ from google.appengine.tools.devappserver2.python import stubs
 CODING_MAGIC_COMMENT_RE = re.compile('coding[:=]\s*([-\w.]+)')
 DEFAULT_ENCODING = 'ascii'
 
-_C_MODULES = frozenset(['cv', 'Crypto', 'lxml', 'numpy', 'PIL'])
+_C_MODULES = frozenset(['cv', 'Crypto', 'lxml', 'grpc', 'numpy', 'PIL'])
 
 NAME_TO_CMODULE_WHITELIST_REGEX = {
     'cv': re.compile(r'cv(\..*)?$'),
     'lxml': re.compile(r'lxml(\..*)?$'),
+    'grpcio': re.compile(r'grpc(\..*)?$'),
     'numpy': re.compile(r'numpy(\..*)?$'),
     'pycrypto': re.compile(r'Crypto(\..*)?$'),
     'PIL': re.compile(r'(PIL(\..*)?|_imaging|_imagingft|_imagingmath)$'),
@@ -297,8 +298,8 @@ def _find_shared_object_c_module():
 
 def _should_keep_module(name):
   """Returns True if the module should be retained after sandboxing."""
-  return (name in ('__builtin__', 'sys', 'codecs', 'encodings', 'site',
-                   'google') or
+  return (name in ('__builtin__', '__main__', 'sys', 'codecs', 'encodings',
+                   'site', 'google') or
           name.startswith('google.') or name.startswith('encodings.') or
 
 
@@ -993,6 +994,7 @@ class PathRestrictingImportHook(object):
         (filename.endswith('.pyc') and
          os.path.exists(filename.replace('.pyc', '.py')))):
       return None
+
     return self
 
   def load_module(self, fullname):

@@ -30,7 +30,7 @@
 #
 # end[licence]
 
-from antlr3.constants import INVALID_TOKEN_TYPE
+from google.appengine._internal.antlr3.constants import INVALID_TOKEN_TYPE
 
 
 class BacktrackingFailed(Exception):
@@ -60,7 +60,7 @@ class RecognitionException(Exception):
     want to quit upon first error, you can turn off the automatic error
     handling mechanism using rulecatch action, but you still need to
     override methods mismatch and recoverFromMismatchSet.
-    
+
     In general, the recognition exceptions can track where in a grammar a
     problem occurred and/or what was the expected input.  While the parser
     knows its state (such as current input symbol and line info) that
@@ -69,7 +69,7 @@ class RecognitionException(Exception):
     perhaps print an entire line of input not just a single token, for example.
     Better to just say the recognizer had a problem and then let the parser
     figure out a fancy report.
-    
+
     """
 
     def __init__(self, input=None):
@@ -107,14 +107,14 @@ class RecognitionException(Exception):
         # that info is approximate.
         self.approximateLineInfo = False
 
-        
+
         if input is not None:
             self.input = input
             self.index = input.index()
 
             # late import to avoid cyclic dependencies
-            from antlr3.streams import TokenStream, CharStream
-            from antlr3.tree import TreeNodeStream
+            from google.appengine._internal.antlr3.streams import TokenStream, CharStream
+            from google.appengine._internal.antlr3.tree import TreeNodeStream
 
             if isinstance(self.input, TokenStream):
                 self.token = self.input.LT(1)
@@ -134,9 +134,9 @@ class RecognitionException(Exception):
                     self.c = self.input.LA(1)
 
     def extractInformationFromTreeNodeStream(self, nodes):
-        from antlr3.tree import Tree, CommonTree
-        from antlr3.tokens import CommonToken
-        
+        from google.appengine._internal.antlr3.tree import Tree, CommonTree
+        from google.appengine._internal.antlr3.tokens import CommonToken
+
         self.node = nodes.LT(1)
         adaptor = nodes.adaptor
         payload = adaptor.getToken(self.node)
@@ -154,14 +154,14 @@ class RecognitionException(Exception):
                         self.charPositionInLine = priorPayload.charPositionInLine
                         self.approximateLineInfo = True
                         break
-                    
+
                     i -= 1
                     priorNode = nodes.LT(i)
-                    
+
             else: # node created from real token
                 self.line = payload.line
                 self.charPositionInLine = payload.charPositionInLine
-                
+
         elif isinstance(self.node, Tree):
             self.line = self.node.line
             self.charPositionInLine = self.node.charPositionInLine
@@ -173,12 +173,12 @@ class RecognitionException(Exception):
             text = adaptor.getText(self.node)
             self.token = CommonToken(type=type, text=text)
 
-     
+
     def getUnexpectedType(self):
         """Return the token type or char of the unexpected input element"""
 
-        from antlr3.streams import TokenStream
-        from antlr3.tree import TreeNodeStream
+        from google.appengine._internal.antlr3.streams import TokenStream
+        from google.appengine._internal.antlr3.tree import TreeNodeStream
 
         if isinstance(self.input, TokenStream):
             return self.token.type
@@ -191,15 +191,15 @@ class RecognitionException(Exception):
             return self.c
 
     unexpectedType = property(getUnexpectedType)
-    
+
 
 class MismatchedTokenException(RecognitionException):
     """@brief A mismatched char or Token or tree node."""
-    
+
     def __init__(self, expecting, input):
         RecognitionException.__init__(self, input)
         self.expecting = expecting
-        
+
 
     def __str__(self):
         #return "MismatchedTokenException("+self.expecting+")"
@@ -264,14 +264,14 @@ class MismatchedRangeException(RecognitionException):
 
         self.a = a
         self.b = b
-        
+
 
     def __str__(self):
         return "MismatchedRangeException(%r not in [%r..%r])" % (
             self.getUnexpectedType(), self.a, self.b
             )
     __repr__ = __str__
-    
+
 
 class MismatchedSetException(RecognitionException):
     """@brief The next token does not match a set of expected types."""
@@ -280,7 +280,7 @@ class MismatchedSetException(RecognitionException):
         RecognitionException.__init__(self, input)
 
         self.expecting = expecting
-        
+
 
     def __str__(self):
         return "MismatchedSetException(%r not in %r)" % (
@@ -291,7 +291,7 @@ class MismatchedSetException(RecognitionException):
 
 class MismatchedNotSetException(MismatchedSetException):
     """@brief Used for remote debugger deserialization"""
-    
+
     def __str__(self):
         return "MismatchedNotSetException(%r!=%r)" % (
             self.getUnexpectedType(), self.expecting
@@ -317,7 +317,7 @@ class NoViableAltException(RecognitionException):
             self.unexpectedType, self.grammarDecisionDescription
             )
     __repr__ = __str__
-    
+
 
 class EarlyExitException(RecognitionException):
     """@brief The recognizer did not match anything for a (..)+ loop."""
@@ -339,7 +339,7 @@ class FailedPredicateException(RecognitionException):
 
     def __init__(self, input, ruleName, predicateText):
         RecognitionException.__init__(self, input)
-        
+
         self.ruleName = ruleName
         self.predicateText = predicateText
 
@@ -347,14 +347,14 @@ class FailedPredicateException(RecognitionException):
     def __str__(self):
         return "FailedPredicateException("+self.ruleName+",{"+self.predicateText+"}?)"
     __repr__ = __str__
-    
+
 
 class MismatchedTreeNodeException(RecognitionException):
     """@brief The next tree mode does not match the expected type."""
 
     def __init__(self, expecting, input):
         RecognitionException.__init__(self, input)
-        
+
         self.expecting = expecting
 
     def __str__(self):

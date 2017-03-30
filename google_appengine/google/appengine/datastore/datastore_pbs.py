@@ -1191,7 +1191,8 @@ class _EntityConverter(object):
     elif v3_property_value.has_booleanvalue():
       v1_value.boolean_value = v3_property_value.booleanvalue()
     elif v3_property_value.has_int64value():
-      if v3_meaning == entity_pb.Property.GD_WHEN:
+      if (v3_meaning == entity_pb.Property.GD_WHEN
+          and is_in_rfc_3339_bounds(v3_property_value.int64value())):
         googledatastore.helper.micros_to_timestamp(
             v3_property_value.int64value(), v1_value.timestamp_value)
         v3_meaning = None
@@ -1380,7 +1381,7 @@ class _EntityConverter(object):
     """
     check_conversion(v1_value.HasField('string_value'),
                      'Value does not contain a string value.')
-    return v1_value.string_value
+    return v1_value.string_value.encode('utf-8')
 
   def __v1_integer_property(self, entity, name, value, indexed):
     """Populates a single-integer-valued v1 Property.
@@ -1651,12 +1652,17 @@ class _QueryConverter(object):
     """
     v1_property_filter.Clear()
     v1_property_filter.set_operator(
+        v3_query.shallow() and
+        googledatastore.PropertyFilter.HAS_PARENT or
         googledatastore.PropertyFilter.HAS_ANCESTOR)
     prop = v1_property_filter.property
     prop.set_name(PROPERTY_NAME_KEY)
-    self._entity_converter.v3_to_v1_key(
-        v3_query.ancestor(),
-        v1_property_filter.value.mutable_key_value)
+    if v3_query.has_ancestor():
+      self._entity_converter.v3_to_v1_key(
+          v3_query.ancestor(),
+          v1_property_filter.value.mutable_key_value)
+    else:
+      v1_property_filter.value.null_value = googledatastore.NULL_VALUE
 
   def v3_order_to_v1_order(self, v3_order, v1_order):
     """Converts a v3 Query order to a v1 PropertyOrder.

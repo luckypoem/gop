@@ -32,9 +32,20 @@ import google
 from google.appengine.tools.devappserver2 import go_errors
 from google.appengine.tools.devappserver2 import safe_subprocess
 
-
-_SDKROOT = os.path.dirname(os.path.dirname(google.__file__))
-GOROOT = os.path.join(_SDKROOT, 'goroot')
+# The location of devappserver2 changes infrequently enough we can be fairly
+# confident depending on the goroot and gopath being in the same place relative
+# to it.
+#
+# This gopath will be used in the event that the user does not already have a
+# GOPATH in their os.environ.
+#
+# devappserver2: $HOME/go_appengine/google/appengine/tools/devappserver2
+# goroot:        $HOME/go_appengine/goroot
+# gopath:        $HOME/go_appengine/gopath
+GOROOT = os.path.normpath(os.path.join(
+    os.path.dirname(__file__), '..', '..', '..', '..', 'goroot'))
+GOPATH = os.path.normpath(os.path.join(
+    os.path.dirname(__file__), '..', '..', '..', '..', 'gopath'))
 
 _GAB_PATH = os.path.join(GOROOT, 'bin', 'go-app-builder')
 if sys.platform.startswith('win'):
@@ -78,11 +89,12 @@ def _get_base_gab_args(application_root, nobuild_files, arch):
       '-arch', arch,
       '-dynamic',
       '-goroot', GOROOT,
+      '-gopath', os.environ.get('GOPATH', GOPATH),
       '-nobuild_files', '^' + str(nobuild_files),
+      '-incremental_rebuild',
       '-unsafe',
   ]
-  if 'GOPATH' in os.environ:
-    gab_args.extend(['-gopath', os.environ['GOPATH']])
+
   return gab_args
 
 
@@ -148,18 +160,19 @@ def list_go_files(application_root, nobuild_files, skip_files):
 class GoApplication(object):
   """An abstraction around the source and executable for a Go application."""
 
-  def __init__(self, module_configuration):
+  def __init__(self, module_configuration, work_dir):
     """Initializer for Module.
 
     Args:
       module_configuration: An application_configuration.ModuleConfiguration
           instance storing the configuration data for a module.
+      work_dir: Directory to store intermediate files.
     """
     self._module_configuration = module_configuration
     self._go_file_to_mtime = {}
     self._extras_hash = None
     self._go_executable = None
-    self._work_dir = None
+    self._work_dir = work_dir
     self._arch = self._get_architecture()
     self._pkg_path = self._get_pkg_path()
 

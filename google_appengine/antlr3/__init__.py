@@ -51,7 +51,7 @@ And tree.TreeParser finally fetches its input from a tree.TreeNodeStream:
 
 - tree.CommonTreeNodeStream: A basic and most commonly used tree.TreeNodeStream
   implementation.
-  
+
 
 @section tokenstrees Tokens and Trees
 

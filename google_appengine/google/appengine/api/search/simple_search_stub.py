@@ -328,12 +328,32 @@ class RamInvertedIndex(object):
   def _AddTokens(self, doc_id, field_name, field_value, token_position):
     """Adds token occurrences for a given doc's field value."""
     for token in self._tokenizer.TokenizeValue(field_value, token_position):
-      self._AddToken(doc_id, token)
-      self._AddToken(doc_id, token.RestrictField(field_name))
+      if (field_value.type() == document_pb.FieldValue.UNTOKENIZED_PREFIX or
+          field_value.type() == document_pb.FieldValue.TOKENIZED_PREFIX):
+        for token in self._ExtractPrefixTokens(token):
+          self._AddToken(doc_id, token.RestrictField(field_name))
+      else:
+        self._AddToken(doc_id, token)
+        self._AddToken(doc_id, token.RestrictField(field_name))
+
+  def _ExtractPrefixTokens(self, token):
+    """Extracts the prefixes from a term."""
+    term = token.chars.strip()
+    prefix_tokens = []
+    for i in range(0, len(term)):
+
+      if term[i]:
+        prefix_tokens.append(tokens.Token(chars=term[:i+1],
+                                          position=token.position))
+    return prefix_tokens
 
   def _RemoveTokens(self, doc_id, field_name, field_value):
     """Removes tokens occurrences for a given doc's field value."""
     for token in self._tokenizer.TokenizeValue(field_value=field_value):
+      if (field_value.type() == document_pb.FieldValue.UNTOKENIZED_PREFIX or
+          field_value.type() == document_pb.FieldValue.TOKENIZED_PREFIX):
+        for token in self._ExtractPrefixTokens(token):
+          self._RemoveToken(doc_id, token.RestrictField(field_name))
       self._RemoveToken(doc_id, token)
       self._RemoveToken(doc_id, token.RestrictField(field_name))
 
@@ -551,15 +571,21 @@ class SimpleIndex(object):
           default_text = sort_spec.default_value_text()
         if sort_spec.has_default_value_numeric():
           default_numeric = sort_spec.default_value_numeric()
+
+        allow_rank = bool(sort_spec.sort_descending())
+
         try:
           text_val = expression_evaluator.ExpressionEvaluator(
               scored_doc, self._inverted_index, True).ValueOf(
-                  sort_spec.sort_expression(), default_value=default_text,
+                  sort_spec.sort_expression(),
+                  default_value=default_text,
                   return_type=search_util.EXPRESSION_RETURN_TYPE_TEXT)
           num_val = expression_evaluator.ExpressionEvaluator(
               scored_doc, self._inverted_index, True).ValueOf(
-                  sort_spec.sort_expression(), default_value=default_numeric,
-                  return_type=search_util.EXPRESSION_RETURN_TYPE_NUMERIC)
+                  sort_spec.sort_expression(),
+                  default_value=default_numeric,
+                  return_type=search_util.EXPRESSION_RETURN_TYPE_NUMERIC,
+                  allow_rank=allow_rank)
         except expression_evaluator.QueryExpressionEvaluationError, e:
           raise expression_evaluator.ExpressionEvaluationError(
               _FAILED_TO_PARSE_SEARCH_REQUEST % (query, e))
@@ -1126,9 +1152,9 @@ class SearchServiceStub(apiproxy_stub.APIProxyStub):
             'Could not read search indexes from %s', self.__index_file)
     except (AttributeError, LookupError, ImportError, NameError, TypeError,
             ValueError, pickle.PickleError, IOError), e:
-      logging.warning(
-          'Could not read indexes from %s. Try running with the '
-          '--clear_search_index flag. Cause:\n%r' % (self.__index_file, e))
+      logging.warning('Could not read indexes from %s. Try running with the '
+                      '--clear_search_index flag. Cause:\n%r',
+                      self.__index_file, e)
     finally:
       self.__index_file_lock.release()
 

@@ -38,7 +38,7 @@ This module contains all support classes for AST construction and tree parsers.
 # lot's of docstrings are missing, don't complain for now...
 # pylint: disable-msg=C0111
 
-from antlr3.tree import CommonTreeAdaptor
+from google.appengine._internal.antlr3.tree import CommonTreeAdaptor
 import stringtemplate3
 
 class DOTTreeGenerator(object):
@@ -114,7 +114,7 @@ class DOTTreeGenerator(object):
         # for each child, do a "<unique-name> [label=text]" node def
         for i in range(n):
             child = adaptor.getChild(tree, i)
-            
+
             number = self.getNodeNumber(child)
             if number not in knownNodes:
                 nodeST = self.getNodeST(adaptor, child)
@@ -203,7 +203,7 @@ def toDOT(tree, adaptor=None, treeST=DOTTreeGenerator._treeST, edgeST=DOTTreeGen
         print tree.toStringTree()
         st = antlr3.extras.toDOT(t)
         print st
-        
+
     """
 
     gen = DOTTreeGenerator()
