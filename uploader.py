@@ -85,6 +85,16 @@ try:
 except Exception:
     pass
 
+try:
+    filename = './google_appengine/httplib2/__init__.py'
+    with open(filename, 'rb') as fp:
+        text = fp.read()
+    if 'self.proxy_rdns = proxy_rdns' in text:
+        with open(filename, 'wb') as fp:
+            fp.write(text.replace('self.proxy_rdns = proxy_rdns', 'self.proxy_rdns = True'))
+except Exception:
+    raise
+
 import httplib2
 def _ssl_wrap_socket(sock, key_file, cert_file,
                      disable_validation, ca_certs):
