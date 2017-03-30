@@ -153,7 +153,9 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	for key, _ := range params {
 		req.Header.Del(key)
 	}
+
 	// req.Header.Del("X-Cloud-Trace-Context")
+	req.Header.Set("Accept-Encoding", "gzip")
 
 	c.Infof("Parsed Request=%#v\n", req)
 
