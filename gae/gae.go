@@ -32,6 +32,24 @@ const (
 	DefaultSSLVerify           = false
 )
 
+func IsBinary(b []byte) bool {
+	if len(b) > 32 {
+		b = b[:32]
+	}
+	if bytes.HasPrefix(b, []byte{0xef, 0xbb, 0xbf}) {
+		return false
+	}
+	for _, c := range b {
+		if c == '\n' {
+			break
+		}
+		if c > 0x7f {
+			return true
+		}
+	}
+	return false
+}
+
 func ReadRequest(r io.Reader) (req *http.Request, err error) {
 	req = new(http.Request)
 
@@ -155,6 +173,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	// req.Header.Del("X-Cloud-Trace-Context")
+	oAE := req.Header.Get("Accept-Encoding")
 	req.Header.Del("Accept-Encoding")
 
 	c.Infof("Parsed Request=%#v\n", req)
@@ -278,44 +297,39 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
 	}
 
-	// if resp.Header.Get("Content-Encoding") == "" {
-	// 	if s := resp.Header.Get("Content-Type"); strings.HasPrefix(s, "text/") ||
-	// 		strings.HasPrefix(s, "application/json") ||
-	// 		strings.HasPrefix(s, "application/x-javascript") ||
-	// 		strings.HasPrefix(s, "application/javascript") {
-	// 		if v := reflect.ValueOf(resp.Body).Elem().FieldByName("content"); v.IsValid() {
-	// 			b := v.Bytes()
-	// 			switch {
-	// 			case IsGzip(b):
-	// 				resp.Header.Set("Content-Encoding", "gzip")
-	// 			case IsBinary(b) && strings.Contains(req.Header.Get("Accept-Encoding"), "deflate"):
-	// 				resp.Header.Set("Content-Encoding", "deflate")
-	// 			}
-	// 		}
-	// 	}
-	// }
+	if s := resp.Header.Get("Content-Type"); strings.HasPrefix(s, "text/") ||
+			strings.HasPrefix(s, "application/json") ||
+			strings.HasPrefix(s, "application/x-javascript") ||
+			strings.HasPrefix(s, "application/javascript") {
+		if v := reflect.ValueOf(resp.Body).Elem().FieldByName("content"); v.IsValid() {
+			b := v.Bytes()
+			if !IsBinary(b) {
+				resp.Header.Del("Content-Encoding")
 
-	// Fix Set-Cookie header for python client
-	// if r.Header.Get("User-Agent") == "" {
-	// 	const cookieHeader string = "Set-Cookie"
-	// 	if resp.Header.Get(cookieHeader) != "" {
-	// 		cookies := make([]string, 0)
-	// 		for _, c := range resp.Cookies() {
-	// 			cookies = append(cookies, c.String())
-	// 		}
-	// 		resp.Header[cookieHeader] = []string{strings.Join(cookies, ", ")}
-	// 	}
-	// }
+				if resp.ContentLength > 1024 && strings.Contains(oAE, "deflate") {
+					var bb bytes.Buffer
+
+					w, _ := flate.NewWriter(&bb, flate.BestCompression)
+					w.Write(b)
+					w.Close()
+
+					bbLen := int64(bb.Len())
+
+					if bbLen < resp.ContentLength {
+						resp.Body = ioutil.NopCloser(&bb)
+						resp.ContentLength = bbLen
+						resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
+						resp.Header.Set("Content-Encoding", "deflate")
+					}
+				}
+			}
+		}
+	}
 
 	c.Infof("Write Response=%#v\n", resp)
 
 	var b bytes.Buffer
-	w, err := flate.NewWriter(&b, flate.BestCompression)
-	if err != nil {
-		handlerError(c, rw, err, http.StatusBadGateway)
-		return
-	}
-
+	w, _ := flate.NewWriter(&b, flate.BestCompression)
 	fmt.Fprintf(w, "HTTP/1.1 %s\r\n", resp.Status)
 	resp.Header.Write(w)
 	io.WriteString(w, "\r\n")
