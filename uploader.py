@@ -89,9 +89,14 @@ try:
     filename = './google_appengine/httplib2/__init__.py'
     with open(filename, 'rb') as fp:
         text = fp.read()
-    if 'self.proxy_rdns = proxy_rdns' in text:
-        with open(filename, 'wb') as fp:
-            fp.write(text.replace('self.proxy_rdns = proxy_rdns', 'self.proxy_rdns = True'))
+    pairs = [
+        ('self.proxy_rdns = proxy_rdns', 'self.proxy_rdns = True'),
+        ('content = zlib.decompress(content)', 'content = zlib.decompress(content, -zlib.MAX_WBITS)'),
+    ]
+    for old, new in pairs:
+        text = text.replace(old, new)
+    with open(filename, 'wb') as fp:
+        fp.write(text)
 except Exception:
     raise
 
