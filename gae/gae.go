@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/flate"
+	"compress/gzip"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -302,16 +303,33 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	ct := resp.Header.Get("Content-Type")
 	resp.Header.Del("Content-Encoding")
 
-	if ce != "" ||
+	if (ce != "" ||
 		strings.HasPrefix(ct, "text/") ||
 		strings.HasPrefix(ct, "application/json") ||
 		strings.HasPrefix(ct, "application/x-javascript") ||
 		strings.HasPrefix(ct, "application/javascript") ||
-		strings.HasPrefix(ct, "application/x-www-form-urlencoded") {
-		if resp.ContentLength > 1024 && strings.Contains(oAE, "deflate") {
-			if v := reflect.ValueOf(resp.Body).Elem().FieldByName("content"); v.IsValid() {
-				var bb bytes.Buffer
-				w, _ := flate.NewWriter(&bb, flate.BestCompression)
+		strings.HasPrefix(ct, "application/x-www-form-urlencoded")) &&
+		resp.ContentLength > 1024 {
+		if v := reflect.ValueOf(resp.Body).Elem().FieldByName("content"); v.IsValid() {
+			var bb bytes.Buffer
+			var w io.WriteCloser
+			var ce1 string
+
+			switch {
+			case strings.Contains(oAE, "deflate"):
+				w, err = flate.NewWriter(&bb, flate.BestCompression)
+				ce1 = "deflate"
+			case strings.Contains(oAE, "gzip"):
+				w, err = gzip.NewWriterLevel(&bb, gzip.BestCompression)
+				ce1 = "gzip"
+			}
+
+			if err != nil {
+				handlerError(c, rw, err, http.StatusBadGateway)
+				return
+			}
+
+			if w != nil {
 				w.Write(v.Bytes())
 				w.Close()
 
@@ -320,7 +338,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 					resp.Body = ioutil.NopCloser(&bb)
 					resp.ContentLength = bbLen
 					resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
-					resp.Header.Set("Content-Encoding", "deflate")
+					resp.Header.Set("Content-Encoding", ce1)
 				}
 			}
 		}
