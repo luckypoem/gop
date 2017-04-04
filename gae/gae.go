@@ -297,30 +297,23 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
 	}
 
-	if s := resp.Header.Get("Content-Type"); strings.HasPrefix(s, "text/") ||
-			strings.HasPrefix(s, "application/json") ||
-			strings.HasPrefix(s, "application/x-javascript") ||
-			strings.HasPrefix(s, "application/javascript") {
-		if v := reflect.ValueOf(resp.Body).Elem().FieldByName("content"); v.IsValid() {
-			b := v.Bytes()
-			if !IsBinary(b) {
-				resp.Header.Del("Content-Encoding")
+	// urlfetch will decompress content, so try remove Content-Encoding
+	if resp.Header.Get("Content-Encoding") != "" {
+		resp.Header.Del("Content-Encoding")
+		// try compress to deflate before response
+		if resp.ContentLength > 1024 && strings.Contains(oAE, "deflate") {
+			if v := reflect.ValueOf(resp.Body).Elem().FieldByName("content"); v.IsValid() {
+				var bb bytes.Buffer
+				w, _ := flate.NewWriter(&bb, flate.BestCompression)
+				w.Write(v.Bytes())
+				w.Close()
 
-				if resp.ContentLength > 1024 && strings.Contains(oAE, "deflate") {
-					var bb bytes.Buffer
-
-					w, _ := flate.NewWriter(&bb, flate.BestCompression)
-					w.Write(b)
-					w.Close()
-
-					bbLen := int64(bb.Len())
-
-					if bbLen < resp.ContentLength {
-						resp.Body = ioutil.NopCloser(&bb)
-						resp.ContentLength = bbLen
-						resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
-						resp.Header.Set("Content-Encoding", "deflate")
-					}
+				bbLen := int64(bb.Len())
+				if bbLen < resp.ContentLength {
+					resp.Body = ioutil.NopCloser(&bb)
+					resp.ContentLength = bbLen
+					resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
+					resp.Header.Set("Content-Encoding", "deflate")
 				}
 			}
 		}
