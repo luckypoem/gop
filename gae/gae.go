@@ -298,9 +298,16 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	// urlfetch will decompress content, so try remove Content-Encoding
-	if resp.Header.Get("Content-Encoding") != "" {
-		resp.Header.Del("Content-Encoding")
-		// try compress to deflate before response
+	ce := resp.Header.Get("Content-Encoding")
+	ct := resp.Header.Get("Content-Type")
+	resp.Header.Del("Content-Encoding")
+
+	if ce != "" ||
+		strings.HasPrefix(ct, "text/") ||
+		strings.HasPrefix(ct, "application/json") ||
+		strings.HasPrefix(ct, "application/x-javascript") ||
+		strings.HasPrefix(ct, "application/javascript") ||
+		strings.HasPrefix(ct, "application/x-www-form-urlencoded") {
 		if resp.ContentLength > 1024 && strings.Contains(oAE, "deflate") {
 			if v := reflect.ValueOf(resp.Body).Elem().FieldByName("content"); v.IsValid() {
 				var bb bytes.Buffer
