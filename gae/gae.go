@@ -183,10 +183,10 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		password := params.Get("X-UrlFetch-Password")
 		switch {
 		case password == "":
-			handlerError(c, rw, fmt.Errorf("No Password."), http.StatusForbidden)
+			handlerError(c, rw, fmt.Errorf("urlfetch password required"), http.StatusForbidden)
 			return
 		case password != Password:
-			handlerError(c, rw, fmt.Errorf("Wrong Password."), http.StatusForbidden)
+			handlerError(c, rw, fmt.Errorf("urlfetch password is wrong"), http.StatusForbidden)
 			return
 		}
 	}
