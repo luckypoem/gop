@@ -142,7 +142,6 @@ func handlerError(c appengine.Context, rw http.ResponseWriter, err error, code i
 func handler(rw http.ResponseWriter, r *http.Request) {
 	var err error
 	c := appengine.NewContext(r)
-	c.Infof("Hanlde Request=%#v\n", r)
 
 	var hdrLen uint16
 	if err := binary.Read(r.Body, binary.BigEndian, &hdrLen); err != nil {
@@ -158,6 +157,8 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.RemoteAddr = r.RemoteAddr
+	req.TLS = r.TLS
 	req.Body = r.Body
 	defer req.Body.Close()
 
@@ -177,7 +178,12 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	oAE := req.Header.Get("Accept-Encoding")
 	req.Header.Del("Accept-Encoding")
 
-	c.Infof("Parsed Request=%#v\n", req)
+	debugHeader := params.Get("X-UrlFetch-Debug")
+	debug := debugHeader != ""
+
+	if debug {
+		c.Infof("Parsed Request=%#v\n", req)
+	}
 
 	if Password != "" {
 		password := params.Get("X-UrlFetch-Password")
@@ -344,7 +350,11 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	c.Infof("Write Response=%#v\n", resp)
+	if debug {
+		c.Infof("Write Response=%#v\n", resp)
+	}
+
+	c.Infof("%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
 
 	var b bytes.Buffer
 	w, _ := flate.NewWriter(&b, flate.BestCompression)
