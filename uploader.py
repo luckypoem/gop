@@ -151,7 +151,7 @@ if __name__ == '__main__':
 ===============================================================
 
 请输入您的appid, 多个appid请用|号隔开
-注意：appid 请勿包含 ios/android/mobile 等字样，否则可能被某些网站识别成移动设备。
+特别提醒：appid 请勿包含 ID/Email 等个人信息！
         '''.strip())
     main()
     println(os.linesep + u'上传成功，请不要忘记编辑 gae.user.json 把你的appid填进去，谢谢。按回车键退出程序。')
